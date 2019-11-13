@@ -1,0 +1,3 @@
+[submodule "mnist/resnet"]
+	path = mnist/resnet
+	url = git@github.com:jose-sv/resnet.git
