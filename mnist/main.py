@@ -178,9 +178,9 @@ def main():
 
 def signal_handler(sig, frame):
     '''Handle an interrupt for a graceful exit'''
-    logging.warning('Interrupt caught: Gracefully Exiting')
+    logging.warning('Interrupt caught: Exiting at end of epoch')
     global TERMINATE
-    TERMINATE = False
+    TERMINATE = True
 
 
 if __name__ == '__main__':
