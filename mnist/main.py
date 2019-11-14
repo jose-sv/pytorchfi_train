@@ -173,9 +173,13 @@ def main():
 
     if not TERMINATE:
         acc = test(mdl, device, test_loader)
+        mem = test(mdl, device, train_loader)
     elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
         acc = test(mdl, device, test_loader)
-    print(f'Final model accuracy: {acc:.2f}%')
+        mem = test(mdl, device, train_loader)
+
+    print(f"""Final model accuracy: {acc:.2f}%
+          Memorized: {mem:.3f}%""")
 
     if args.save_model:
         if TERMINATE:
