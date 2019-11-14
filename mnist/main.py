@@ -173,12 +173,13 @@ def main():
 
     if not TERMINATE:
         acc = test(mdl, device, test_loader)
-    elif input('Evaluate? y/[n]') != 'y':
+    elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
         acc = test(mdl, device, test_loader)
     print(f'Final model accuracy: {acc}')
 
     if args.save_model:
         if TERMINATE:
+            # only ask if terminated
             if input('Early terminated, save model? y/[n]') != 'y':
                 logging.warning("Didn't save")
                 return
