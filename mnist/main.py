@@ -29,7 +29,7 @@ def train(model, device, train_loader, optimizer):
         loss.backward()
         optimizer.step()
 
-        pbar.set_postfix(loss=loss.item())
+        pbar.set_postfix(loss=f'{loss.item():.2f}')
 
 
 def get_lr(mizer):
@@ -43,6 +43,7 @@ def test(model, device, test_loader):
     model.eval()
     test_loss = 0
     correct = 0
+    total = 0
     criterion = nn.CrossEntropyLoss()  # NOQA
     pbar = tqdm(test_loader, unit='Batches', desc='Testing')
     with torch.no_grad():
@@ -52,14 +53,20 @@ def test(model, device, test_loader):
             # sum up batch loss
             test_loss += criterion(output, target.to(device)).item()
             # get the index of the max log-probability
-            pred = output.argmax(dim=1, keepdim=True)
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            # pred = output.argmax(dim=1, keepdim=True)
+            _, pred = output.max(1)
+            correct += pred.eq(target).sum().item()
+            total += len(data)
+            pbar.set_postfix(correct=f'{correct/total * 100:.2f}%')
 
     test_loss /= len(test_loader.dataset)
 
     accuracy = 100. * correct / len(test_loader.dataset)
     # logging.info('Validation Accuracy: %.4f Loss: %.4f', accuracy, test_loss)
-    tqdm.write(f'Validation Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}')
+    tqdm.write(
+        f'Validation Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f} '
+        f'({correct}/{len(test_loader.dataset)})'
+    )
     return accuracy
 
 
@@ -84,7 +91,7 @@ def main():
                         help='random seed (default: 1)')
     parser.add_argument('--log-frequency', type=int, default=50)
 
-    parser.add_argument('--save-model', action='store_true', default=False,
+    parser.add_argument('--save-model', action='store_true', default=True,
                         help='For Saving the current Model')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -110,9 +117,8 @@ def main():
                          ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10('/scratch/data', train=True, download=True,
+        datasets.CIFAR10('/scratch/data', train=False, download=True,
                          transform=transforms.Compose([
-                             # transforms.Resize(24),
                              transforms.ToTensor(),
                              transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                   (0.2023, 0.1994, 0.2010))
@@ -133,19 +139,25 @@ def main():
         mdl = model
         name = "cifar_resnet18.pt"
 
-    desc = 'PFI Training' if args.use_pfi else 'Training'
-    with trange(1, args.epochs + 1, unit='Epoch', desc=desc) as pbar:
-        acc = test(model, device, test_loader)
+    acc = test(model, device, test_loader)
+    with trange(1, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
         for epoch in pbar:
-            pbar.set_postfix(lr=get_lr(optimizer), acc=acc)
-            train(mdl, device, train_loader, optimizer)
-            if epoch % args.log_frequency == 0:
+            # validation every N epochs
+            # also check to see if PFI should be turned on now
+            if epoch % args.log_frequency == 0 and epoch != 0:
                 acc = test(mdl, device, test_loader)
-                if args.use_pfi and epoch == 200:
+
+                # change to PFI at epoch 50
+                # delayed to increase likelihood of convergence
+                if args.use_pfi and epoch == 50:
                     pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
                     inj_model = pfi_util.random_inj_per_layer()
                     mdl = inj_model
+                    pbar.set_desc('PFI Training')
 
+            pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
+
+            train(mdl, device, train_loader, optimizer)
             scheduler.step()
 
     if args.save_model:
