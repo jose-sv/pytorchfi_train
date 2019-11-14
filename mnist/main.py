@@ -29,7 +29,7 @@ def train(model, device, train_loader, optimizer):
         loss.backward()
         optimizer.step()
 
-        pbar.set_postfix(loss=f'{loss.item():.2f}')
+        pbar.set_postfix(loss=f'{loss.item():.2f}')  # noqa
 
 
 def get_lr(mizer):
@@ -98,6 +98,7 @@ def main():
 
     torch.manual_seed(args.seed)
 
+    # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
 
     logging.info('Using %s', 'GPU' if use_cuda else 'CPU')
@@ -161,7 +162,7 @@ def main():
             scheduler.step()
 
     if args.save_model:
-        torch.save(inj_model.state_dict(), name)
+        torch.save(mdl.state_dict(), name)
 
 
 if __name__ == '__main__':
