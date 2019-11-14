@@ -175,7 +175,7 @@ def main():
         acc = test(mdl, device, test_loader)
     elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
         acc = test(mdl, device, test_loader)
-    print(f'Final model accuracy: {acc}')
+    print(f'Final model accuracy: {acc:.2f}%')
 
     if args.save_model:
         if TERMINATE:
