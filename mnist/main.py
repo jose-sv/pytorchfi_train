@@ -161,7 +161,7 @@ def main():
         mem = test(mdl, device, train_loader)
         eval_confidences(mdl, device, test_loader)
     else:
-        mem = 'NA'
+        mem = 0.0
 
     print(f"""Final model accuracy: {acc:.2f}%
           Memorized: {mem:.3f}%""")
