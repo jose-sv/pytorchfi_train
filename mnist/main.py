@@ -171,7 +171,13 @@ def main():
             train(mdl, device, train_loader, optimizer)
             scheduler.step()
 
+    acc = test(mdl, device, test_loader)
+    print(f'Final model accuracy: {acc}')
+
     if args.save_model:
+        if TERMINATE:
+            if input('Early terminated, save model? y/[n]') != 'y':
+                return
         torch.save(mdl.state_dict(), name)
         logging.info('Saved %s', name)
 
@@ -189,5 +195,3 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
     main()
-
-    signal.pause()
