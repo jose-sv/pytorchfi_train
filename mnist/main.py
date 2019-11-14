@@ -99,24 +99,34 @@ def main():
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=True, download=True,
-                       transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
+        datasets.CIFAR10('/scratch/data', train=True, download=True,
+                         transform=transforms.Compose([
+                             transforms.RandomCrop(24),
+                             transforms.RandomHorizontalFlip(),
+                             transforms.ColorJitter(brightness=0.1,
+                                                    contrast=0.1,
+                                                    saturation=0.1),
+                             transforms.ToTensor(),
+                             transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                  (0.2023, 0.1994, 0.2010))
+                         ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=False, transform=transforms.Compose([
-                           transforms.ToTensor(),
-                           transforms.Normalize((0.1307,), (0.3081,))
-                       ])),
-        batch_size=args.test_batch_size, shuffle=True, **kwargs)
+        datasets.CIFAR10('/scratch/data', train=True, download=True,
+                         transform=transforms.Compose([
+                             transforms.RandomCrop(24),
+                             transforms.ToTensor(),
+                             transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                  (0.2023, 0.1994, 0.2010))
+                         ])),
+        batch_size=args.batch_size, shuffle=True, **kwargs)
 
     model = ResNet18().to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
     scheduler = MultiStepLR(optimizer, milestones=[150, 250, 350],
                             gamma=args.gamma)
+
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch)
         test(args, model, device, test_loader)
