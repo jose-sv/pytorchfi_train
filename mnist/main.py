@@ -171,12 +171,16 @@ def main():
             train(mdl, device, train_loader, optimizer)
             scheduler.step()
 
-    acc = test(mdl, device, test_loader)
+    if not TERMINATE:
+        acc = test(mdl, device, test_loader)
+    elif input('Evaluate? y/[n]') != 'y':
+        acc = test(mdl, device, test_loader)
     print(f'Final model accuracy: {acc}')
 
     if args.save_model:
         if TERMINATE:
             if input('Early terminated, save model? y/[n]') != 'y':
+                logging.warning("Didn't save")
                 return
         torch.save(mdl.state_dict(), name)
         logging.info('Saved %s', name)
