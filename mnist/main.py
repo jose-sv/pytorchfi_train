@@ -79,8 +79,8 @@ def main():
     parser.add_argument('--test-batch-size', type=int, default=128,
                         metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=450, metavar='N',
-                        help='number of epochs to train (default: 450)')
+    parser.add_argument('--epochs', type=int, default=350, metavar='N',
+                        help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
                         help='learning rate (default: 1.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -130,7 +130,7 @@ def main():
     optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=5e-4,
                           momentum=0.9)
 
-    scheduler = MultiStepLR(optimizer, milestones=[150, 250, 350],
+    scheduler = MultiStepLR(optimizer, milestones=[150, 250],
                             gamma=0.1)
 
     if args.use_pfi:
@@ -163,6 +163,7 @@ def main():
 
     if args.save_model:
         torch.save(mdl.state_dict(), name)
+        logging.info('Saved %s', name)
 
 
 if __name__ == '__main__':
