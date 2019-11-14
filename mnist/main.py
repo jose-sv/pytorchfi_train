@@ -74,32 +74,13 @@ def test(model, device, test_loader):
     return accuracy
 
 
+def eval_confidences(model, device, test_loader):
+    '''Calculate statistics on the confidences across a dataset'''
+    return
+
+
 def main():
     '''Setup and iterate over training'''
-    global TERMINATE
-
-    # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--batch-size', type=int, default=128, metavar='N',
-                        help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=128,
-                        metavar='N',
-                        help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=350, metavar='N',
-                        help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
-                        help='learning rate (default: 1.0)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    parser.add_argument('--use-pfi', action='store_true', default=False,
-                        help='Use PFI as a dropout alternative')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
-    parser.add_argument('--log-frequency', type=int, default=50)
-
-    parser.add_argument('--save-model', action='store_true', default=True,
-                        help='For Saving the current Model')
-    args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     torch.manual_seed(args.seed)
@@ -174,9 +155,13 @@ def main():
     if not TERMINATE:
         acc = test(mdl, device, test_loader)
         mem = test(mdl, device, train_loader)
+        eval_confidences(mdl, device, test_loader)
     elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
         acc = test(mdl, device, test_loader)
         mem = test(mdl, device, train_loader)
+        eval_confidences(mdl, device, test_loader)
+    else:
+        mem = 'NA'
 
     print(f"""Final model accuracy: {acc:.2f}%
           Memorized: {mem:.3f}%""")
@@ -202,5 +187,28 @@ if __name__ == '__main__':
     import signal
     signal.signal(signal.SIGINT, signal_handler)
     logging.basicConfig(level=logging.DEBUG)
+
+    # Training settings
+    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser.add_argument('--batch-size', type=int, default=128, metavar='N',
+                        help='input batch size for training (default: 64)')
+    parser.add_argument('--test-batch-size', type=int, default=128,
+                        metavar='N',
+                        help='input batch size for testing (default: 1000)')
+    parser.add_argument('--epochs', type=int, default=350, metavar='N',
+                        help='number of epochs to train (default: 350)')
+    parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
+                        help='learning rate (default: 1.0)')
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
+    parser.add_argument('--use-pfi', action='store_true', default=False,
+                        help='Use PFI as a dropout alternative')
+    parser.add_argument('--seed', type=int, default=1, metavar='S',
+                        help='random seed (default: 1)')
+    parser.add_argument('--log-frequency', type=int, default=50)
+
+    parser.add_argument('--save-model', action='store_true', default=True,
+                        help='For Saving the current Model')
+    args = parser.parse_args()
 
     main()
