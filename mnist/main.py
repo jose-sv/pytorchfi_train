@@ -15,6 +15,10 @@ from pytorchfi import PyTorchFI_Core as pfi_core
 from resnet.models.resnet import ResNet18
 
 
+# early termination by signal
+TERMINATE = False
+
+
 def train(model, device, train_loader, optimizer):
     '''Train the model'''
     model.train()
@@ -158,6 +162,10 @@ def main():
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
 
+            if TERMINATE:
+                logging.info('Terminating')
+                break
+
             train(mdl, device, train_loader, optimizer)
             scheduler.step()
 
@@ -166,6 +174,17 @@ def main():
         logging.info('Saved %s', name)
 
 
+def signal_handler(sig, frame):
+    '''Handle an interrupt for a graceful exit'''
+    logging.warn('Interrupt caught: Gracefully Exiting')
+    TERMINATE = False
+
+
 if __name__ == '__main__':
+    import signal
+    signal.signal(signal.SIGINT, signal_handler)
     logging.basicConfig(level=logging.DEBUG)
+
     main()
+
+    signal.pause()
