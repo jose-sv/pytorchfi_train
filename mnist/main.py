@@ -76,6 +76,8 @@ def test(model, device, test_loader):
 
 def main():
     '''Setup and iterate over training'''
+    global TERMINATE
+
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
     parser.add_argument('--batch-size', type=int, default=128, metavar='N',
@@ -176,7 +178,8 @@ def main():
 
 def signal_handler(sig, frame):
     '''Handle an interrupt for a graceful exit'''
-    logging.warn('Interrupt caught: Gracefully Exiting')
+    logging.warning('Interrupt caught: Gracefully Exiting')
+    global TERMINATE
     TERMINATE = False
 
 
