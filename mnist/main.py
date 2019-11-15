@@ -77,6 +77,8 @@ def eval_confidences(model, device, test_loader):
 
 def main():
     '''Setup and iterate over training'''
+    global TERMINATE
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
     # pylint: disable=E1101
@@ -154,8 +156,11 @@ def main():
             pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
 
             if TERMINATE:
-                logging.info('Terminating')
-                break
+                if input('Really quit? [y]/n') != 'n':
+                    logging.info('Terminating')
+                    break
+                else:
+                    TERMINATE = False
 
             train(mdl, device, train_loader, optimizer)
             scheduler.step()
