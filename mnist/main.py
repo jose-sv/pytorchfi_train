@@ -229,7 +229,7 @@ def main(args, name, use_cuda):
 
 def signal_handler(sig, frame):
     '''Handle an interrupt for a graceful exit'''
-    logging.warning('Interrupt caught: Exiting at end of epoch')
+    logging.warning('Caught %s at %s: Exiting at end of epoch', sig, frame)
     global TERMINATE
     TERMINATE = True
 
