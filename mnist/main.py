@@ -96,10 +96,15 @@ def eval_confidences(model, device, test_loader):
     return accuracy, confidences
 
 
-def try_resume(name, model):
+def try_resume(name, device):
     '''If an unfinished model exists, load and use it.
 
+    Input: model
+
+    Return: model
+
     Return the model to use, and the epoch to start training from'''
+    model = ResNet18().to(device)
     estrt = 0
 
     # if unfinalized exists, attempt to load from that first
@@ -109,11 +114,12 @@ def try_resume(name, model):
 
     elif os.path.isfile(name):
         prev = torch.load(name)
-    else:
+    else:  # nothing to resume!
+        logging.info('Nothing to resume')
         return model, estrt
 
     if prev['epoch'] != -1:  # didn't complete
-        logging.info('Resuming from %s at epoch %i, acc %i', name,
+        logging.info('Resuming from %s at epoch %i, acc %i', prev,
                      prev['epoch'], prev['acc'])
         model.load_state_dict(prev['net'])
         estrt = prev['epoch']
@@ -123,11 +129,9 @@ def try_resume(name, model):
     return model, estrt
 
 
-def main(ARGS):
+def main(args, name, use_cuda):
     '''Setup and iterate over training'''
     global TERMINATE
-
-    use_cuda = not ARGS.no_cuda and torch.cuda.is_available()
 
     # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -147,7 +151,7 @@ def main(ARGS):
                              transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                   (0.2023, 0.1994, 0.2010))
                          ])),
-        batch_size=ARGS.batch_size, shuffle=True, **kwargs)
+        batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10('/scratch/data', train=False, download=True,
                          transform=transforms.Compose([
@@ -155,29 +159,24 @@ def main(ARGS):
                              transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                   (0.2023, 0.1994, 0.2010))
                          ])),
-        batch_size=ARGS.batch_size, shuffle=True, **kwargs)
+        batch_size=args.batch_size, shuffle=True, **kwargs)
 
-    model = ResNet18().to(device)
-    name = "cifar_resnet18.pt"
-    if ARGS.use_pfi:
-        name = f"pfi_{name}"
-        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
-    model, estrt = try_resume(name, model)
+    model, estrt = try_resume(name, device)
 
     # TODO test try resume
     pdb.set_trace()
 
     # TODO @ma3mool please check whether optimizer must be updated when
     # switching to PFI (Issue #1)
-    optimizer = optim.SGD(model.parameters(), lr=ARGS.lr, weight_decay=5e-4,
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=5e-4,
                           momentum=0.9)
 
     scheduler = MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1,
                             last_epoch=estrt)
 
-    with trange(estrt, ARGS.epochs + 1, unit='Epoch', desc='Training') as pbar:
+    with trange(estrt, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
         for epoch in pbar:
-            if epoch % ARGS.log_frequency == 0 or epoch == ARGS.pfi_epoch:
+            if epoch % args.log_frequency == 0 or epoch == args.pfi_epoch:
                 # test
                 t_out = test(model, device, test_loader)
 
@@ -187,15 +186,15 @@ def main(ARGS):
                             'epoch': epoch}, 'tmp.ckpt')
                 tqdm.write(f'Updated tmp.ckpt')
 
-                if ARGS.use_pfi:
-                    pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
-                    model = pfi_util.random_inj_per_layer()
-                    pbar.set_description('PFI Training')
-
                 tqdm.write(
                     f"Validation Accuracy ({epoch}): {t_out['acc']:.4f}, "
                     f"Loss: {t_out['tloss']:.4f} "
                     f"({t_out['corr']}/{t_out['len']})")
+
+            if args.use_pfi and epoch == args.pfi_epoch:  # change model
+                pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+                model = pfi_util.random_inj_per_layer()
+                pbar.set_description('PFI Training')
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f"{t_out['acc']:.2f}%")
 
@@ -218,13 +217,13 @@ def main(ARGS):
               Memorized: {m_out['acc']:.3f}%
               Confidences: {conf}""")
 
-    if ARGS.save_model:
+    if args.save_model:
         if TERMINATE and input('Early terminated, save model? y/[n]') != 'y':
             # only ask if terminated
             logging.warning("Didn't save")
             return
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
-                    'epoch': -1}, 'tmp.ckpt')
+                    'epoch': -1}, name)
         logging.info('Saved %s', name)
 
 
@@ -243,29 +242,36 @@ if __name__ == '__main__':
     # TODO allow for model ckpt name/path specification
 
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--use-pfi', action='store_true', default=False,
+    PARSER = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    PARSER.add_argument('--use-pfi', action='store_true', default=False,
                         help='Use PFI as a dropout alternative')
-    parser.add_argument('--pfi-epoch', type=int, default=50,
+    PARSER.add_argument('--pfi-epoch', type=int, default=50,
                         help='Epoch at which to activate PFI')
 
-    parser.add_argument('--batch-size', type=int, default=128, metavar='N',
+    PARSER.add_argument('--batch-size', type=int, default=128, metavar='N',
                         help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=128,
+    PARSER.add_argument('--test-batch-size', type=int, default=128,
                         metavar='N',
                         help='input batch size for testing (default: 1000)')
 
-    parser.add_argument('--epochs', type=int, default=350, metavar='N',
+    PARSER.add_argument('--epochs', type=int, default=350, metavar='N',
                         help='number of epochs to train (default: 350)')
-    parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
+    PARSER.add_argument('--lr', type=float, default=0.1, metavar='LR',
                         help='learning rate (default: 1.0)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
+    PARSER.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
-    parser.add_argument('--log-frequency', type=int, default=50)
+    PARSER.add_argument('--log-frequency', type=int, default=50)
 
-    parser.add_argument('--save-model', action='store_true', default=True,
+    PARSER.add_argument('--save-model', action='store_true', default=True,
                         help='For Saving the current Model')
-    ARGS = parser.parse_args()
+    ARGS = PARSER.parse_args()
 
-    main(ARGS)
+    NAME = "cifar_resnet18.pt"
+    if ARGS.use_pfi:
+        NAME = f"pfi_{NAME}"
+        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
+
+    USE_CUDA = not ARGS.no_cuda and torch.cuda.is_available()
+
+    main(ARGS, NAME, USE_CUDA)
     # TODO migrate model off local server after training
