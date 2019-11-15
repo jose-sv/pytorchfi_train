@@ -182,13 +182,9 @@ def main(ARGS):
                 t_out = test(model, device, test_loader)
 
                 # update
-                state = {
-                    'net': model.state_dict(),
-                    'acc': t_out['acc'],
-                    'epoch': epoch
-                }
                 # use a tmp model to prevent accidental overwrites
-                torch.save(model.state_dict(), 'tmp.ckpt')
+                torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
+                            'epoch': epoch}, 'tmp.ckpt')
                 tqdm.write(f'Updated tmp.ckpt')
 
                 if ARGS.use_pfi:
@@ -227,12 +223,8 @@ def main(ARGS):
             # only ask if terminated
             logging.warning("Didn't save")
             return
-        state = {
-            'net': model.state_dict(),
-            'acc': t_out['acc'],
-            'epoch': -1
-        }
-        torch.save(model.state_dict(), name)
+        torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
+                    'epoch': -1}, 'tmp.ckpt')
         logging.info('Saved %s', name)
 
 
