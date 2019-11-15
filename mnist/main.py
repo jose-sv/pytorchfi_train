@@ -74,6 +74,7 @@ def test(model, device, test_loader):
 
 def eval_confidences(model, device, test_loader):
     '''Calculate statistics on the confidences across a dataset'''
+    return -1.0, np.zeros(10)
     model.eval()
     correct = 0
     confidences = np.zeros(10)
