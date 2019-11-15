@@ -161,16 +161,15 @@ def main(args, name, use_cuda):
 
     model, estrt = try_resume(name, device)
 
-    # TODO test try resume
-    pdb.set_trace()
-
     # TODO @ma3mool please check whether optimizer must be updated when
     # switching to PFI (Issue #1)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=5e-4,
                           momentum=0.9)
 
-    scheduler = MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1,
-                            last_epoch=estrt)
+    scheduler = MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1)
+
+    for _ in range(estrt):
+        scheduler.step()
 
     with trange(estrt, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
         for epoch in pbar:
