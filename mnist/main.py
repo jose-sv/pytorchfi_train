@@ -2,10 +2,11 @@
 from __future__ import print_function
 import argparse
 import logging
+import pdb
 from tqdm import tqdm, trange
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 from torchvision import datasets, transforms
@@ -72,7 +73,22 @@ def test(model, device, test_loader):
 
 def eval_confidences(model, device, test_loader):
     '''Calculate statistics on the confidences across a dataset'''
-    return
+    model.eval()
+    correct = 0
+    confidences = np.zeros(10)
+    pbar = tqdm(test_loader, unit='Batches', desc='Confidences')
+    with torch.no_grad():
+        for data, target in pbar:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            confidences += output.numpy()
+            # get the index of the max log-probability
+            _, pred = output.max(1)
+            correct += pred.eq(target).sum().item()
+
+    accuracy = 100. * correct / len(test_loader.dataset)
+    confidences /= len(test_loader.dataset)
+    return accuracy, confidences
 
 
 def main():
@@ -165,19 +181,20 @@ def main():
             train(mdl, device, train_loader, optimizer)
             scheduler.step()
 
+    pdb.set_trace()
     if not TERMINATE:
-        acc = test(mdl, device, test_loader)
-        mem = test(mdl, device, train_loader)
-        eval_confidences(mdl, device, test_loader)
+        acc, conf = eval_confidences(mdl, device, test_loader)
+        mem, _, _, _ = test(mdl, device, train_loader)
     elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
-        acc = test(mdl, device, test_loader)
-        mem = test(mdl, device, train_loader)
-        eval_confidences(mdl, device, test_loader)
+        acc, conf = eval_confidences(mdl, device, test_loader)
+        mem, _, _, _ = test(mdl, device, train_loader)
     else:
+        conf = np.zeros(10)
         mem = -1.0
 
     print(f"""Final model accuracy: {acc:.2f}%
-          Memorized: {mem:.3f}%""")
+          Memorized: {mem:.3f}%
+          Confidences: {conf}""")
 
     if args.save_model:
         if TERMINATE:
