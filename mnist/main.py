@@ -67,11 +67,7 @@ def test(model, device, test_loader):
 
     accuracy = 100. * correct / len(test_loader.dataset)
     # logging.info('Validation Accuracy: %.4f Loss: %.4f', accuracy, test_loss)
-    tqdm.write(
-        f'Validation Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f} '
-        f'({correct}/{len(test_loader.dataset)})'
-    )
-    return accuracy
+    return accuracy, test_loss, correct, len(test_loader.dataset)
 
 
 def eval_confidences(model, device, test_loader):
@@ -126,13 +122,22 @@ def main():
         mdl = model
         name = "cifar_resnet18.pt"
 
-    acc = test(model, device, test_loader)
+    acc, loss, cor, tot = test(model, device, test_loader)
     with trange(1, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
+        tqdm.write(
+            f'Validation Accuracy (-1): {acc:.4f}, '
+            f'Loss: {loss:.4f} '
+            f'({cor}/{tot})')
         for epoch in pbar:
             if args.use_pfi and epoch == args.pfi_epoch:
                 # change to PFI
                 # delayed to increase likelihood of convergence
-                acc = test(mdl, device, test_loader)
+                acc, loss, cor, tot = test(mdl, device, test_loader)
+                tqdm.write(
+                    f'Validation Accuracy ({epoch}): {acc:.4f}, '
+                    f'Loss: {loss:.4f} '
+                    f'({cor}/{tot})')
+
                 pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
                 inj_model = pfi_util.random_inj_per_layer()
                 mdl = inj_model
@@ -140,7 +145,11 @@ def main():
             elif epoch % args.log_frequency == 0 and epoch != 0:
                 # validation every N epochs
                 # also check to see if PFI should be turned on now
-                acc = test(mdl, device, test_loader)
+                acc, loss, cor, tot = test(mdl, device, test_loader)
+                tqdm.write(
+                    f'Validation Accuracy ({epoch}): {acc:.4f}, '
+                    f'Loss: {loss:.4f} '
+                    f'({cor}/{tot})')
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
 
