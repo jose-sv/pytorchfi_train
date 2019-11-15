@@ -3,6 +3,7 @@ from __future__ import print_function
 import argparse
 import logging
 import pdb
+import os
 from tqdm import tqdm, trange
 import numpy as np
 import torch
@@ -69,13 +70,13 @@ def test(model, device, test_loader):
 
     accuracy = 100. * correct / len(test_loader.dataset)
     # logging.info('Validation Accuracy: %.4f Loss: %.4f', accuracy, test_loss)
-    return accuracy, test_loss, correct, len(test_loader.dataset)
+    return {'acc': accuracy, 'tloss': test_loss, 'corr': correct, 'len':
+            len(test_loader.dataset)}
 
 
 def eval_confidences(model, device, test_loader):
     '''Calculate statistics on the confidences across a dataset'''
-    return -1.0, np.zeros(10)
-
+    # TODO calculate tolerance(top2-diff)
     model.eval()
     correct = 0
     confidences = np.zeros(10)
@@ -95,7 +96,34 @@ def eval_confidences(model, device, test_loader):
     return accuracy, confidences
 
 
-def main():
+def try_resume(name, model):
+    '''If an unfinished model exists, load and use it.
+
+    Return the model to use, and the epoch to start training from'''
+    estrt = 0
+
+    # if unfinalized exists, attempt to load from that first
+    if os.path.isfile('tmp.ckpt') and \
+       input('Load from unfinalized? [y]/n') != 'n':
+        prev = torch.load('tmp.ckpt')
+
+    elif os.path.isfile(name):
+        prev = torch.load(name)
+    else:
+        return model, estrt
+
+    if prev['epoch'] != -1:  # didn't complete
+        logging.info('Resuming from %s at epoch %i, acc %i', name,
+                     prev['epoch'], prev['acc'])
+        model.load_state_dict(prev['net'])
+        estrt = prev['epoch']
+    else:
+        logging.warning('Overwriting %s', name)
+
+    return model, estrt
+
+
+def main(ARGS):
     '''Setup and iterate over training'''
     global TERMINATE
 
@@ -130,96 +158,82 @@ def main():
         batch_size=ARGS.batch_size, shuffle=True, **kwargs)
 
     model = ResNet18().to(device)
+    name = "cifar_resnet18.pt"
+    if ARGS.use_pfi:
+        name = f"pfi_{name}"
+        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
+    model, estrt = try_resume(name, model)
+
+    # TODO test try resume
+    pdb.set_trace()
+
+    # TODO @ma3mool please check whether optimizer must be updated when
+    # switching to PFI (Issue #1)
     optimizer = optim.SGD(model.parameters(), lr=ARGS.lr, weight_decay=5e-4,
                           momentum=0.9)
 
-    scheduler = MultiStepLR(optimizer, milestones=[150, 250],
-                            gamma=0.1)
+    scheduler = MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1,
+                            last_epoch=estrt)
 
-    if ARGS.use_pfi:
-        mdl = model
-        name = "pfi_cifar_resnet18.pt"
-        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
-    else:
-        mdl = model
-        name = "cifar_resnet18.pt"
-
-    # TODO resume from existing model
-    # if: existing model did not complete
-
-    acc, loss, cor, tot = test(model, device, test_loader)
-    with trange(1, ARGS.epochs + 1, unit='Epoch', desc='Training') as pbar:
-        tqdm.write(
-            f'Validation Accuracy (-1): {acc:.4f}, '
-            f'Loss: {loss:.4f} '
-            f'({cor}/{tot})')
+    with trange(estrt, ARGS.epochs + 1, unit='Epoch', desc='Training') as pbar:
         for epoch in pbar:
-            if ARGS.use_pfi and epoch == ARGS.pfi_epoch:
-                # change to PFI
-                # delayed to increase likelihood of convergence
-                acc, loss, cor, tot = test(mdl, device, test_loader)
+            if epoch % ARGS.log_frequency == 0 or epoch == ARGS.pfi_epoch:
+                # test
+                t_out = test(model, device, test_loader)
+
+                # update
+                state = {
+                    'net': model.state_dict(),
+                    'acc': t_out['acc'],
+                    'epoch': epoch
+                }
+                # use a tmp model to prevent accidental overwrites
+                torch.save(model.state_dict(), 'tmp.ckpt')
+                tqdm.write(f'Updated tmp.ckpt')
+
+                if ARGS.use_pfi:
+                    pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+                    model = pfi_util.random_inj_per_layer()
+                    pbar.set_description('PFI Training')
+
                 tqdm.write(
-                    f'Validation Accuracy ({epoch}): {acc:.4f}, '
-                    f'Loss: {loss:.4f} '
-                    f'({cor}/{tot})')
+                    f"Validation Accuracy ({epoch}): {t_out['acc']:.4f}, "
+                    f"Loss: {t_out['tloss']:.4f} "
+                    f"({t_out['corr']}/{t_out['len']})")
 
-                pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
-                inj_model = pfi_util.random_inj_per_layer()
-                mdl = inj_model
-                pbar.set_description('PFI Training')
-
-                torch.save(mdl.state_dict(), name)
-                tqdm.write(f'Updated {name}')
-            elif epoch % ARGS.log_frequency == 0 and epoch != 0:
-                # validation every N epochs
-                # also check to see if PFI should be turned on now
-                acc, loss, cor, tot = test(mdl, device, test_loader)
-                tqdm.write(
-                    f'Validation Accuracy ({epoch}): {acc:.4f}, '
-                    f'Loss: {loss:.4f} '
-                    f'({cor}/{tot})')
-
-                torch.save(mdl.state_dict(), name)
-                tqdm.write(f'Updated {name}')
-
-            pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
+            pbar.set_postfix(lr=get_lr(optimizer), acc=f"{t_out['acc']:.2f}%")
 
             if TERMINATE:
-                if input('Really quit? [y]/n') != 'n':
+                if input('Quit? [y]/n') != 'n':
                     logging.info('Terminating')
                     break
                 else:
                     TERMINATE = False
 
-            train(mdl, device, train_loader, optimizer)
+            train(model, device, train_loader, optimizer)
             scheduler.step()
 
-    if not TERMINATE:
-        # acc, conf = eval_confidences(mdl, device, test_loader)
-        conf = np.zeros(10)
-        acc, _, _, _ = test(mdl, device, test_loader)
-        mem, _, _, _ = test(mdl, device, train_loader)
-    elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
-        # acc, conf = eval_confidences(mdl, device, test_loader)
-        conf = np.zeros(10)
-        acc, _, _, _ = test(mdl, device, test_loader)
-        mem, _, _, _ = test(mdl, device, train_loader)
-    else:
-        conf = np.zeros(10)
-        mem = -1.0
+    if not TERMINATE or input('Evaluate? y/[n]') == 'y':
+        t_out, conf = eval_confidences(model, device, test_loader)
+        # t_out = test(model, device, test_loader)
+        m_out = test(model, device, train_loader)
+
+        print(f"""Final model accuracy: {t_out['acc']:.2f}%
+              Memorized: {m_out['acc']:.3f}%
+              Confidences: {conf}""")
 
     if ARGS.save_model:
-        if TERMINATE:
+        if TERMINATE and input('Early terminated, save model? y/[n]') != 'y':
             # only ask if terminated
-            if input('Early terminated, save model? y/[n]') != 'y':
-                logging.warning("Didn't save")
-                return
-        torch.save(mdl.state_dict(), name)
+            logging.warning("Didn't save")
+            return
+        state = {
+            'net': model.state_dict(),
+            'acc': t_out['acc'],
+            'epoch': -1
+        }
+        torch.save(model.state_dict(), name)
         logging.info('Saved %s', name)
-
-    print(f"""Final model accuracy: {acc:.2f}%
-          Memorized: {mem:.3f}%
-          Confidences: {conf}""")
 
 
 def signal_handler(sig, frame):
@@ -230,7 +244,6 @@ def signal_handler(sig, frame):
 
 
 if __name__ == '__main__':
-    # TODO check for existing model before overwrite
     import signal
     signal.signal(signal.SIGINT, signal_handler)
     logging.basicConfig(level=logging.DEBUG)
@@ -262,5 +275,5 @@ if __name__ == '__main__':
                         help='For Saving the current Model')
     ARGS = parser.parse_args()
 
-    main()
+    main(ARGS)
     # TODO migrate model off local server after training
