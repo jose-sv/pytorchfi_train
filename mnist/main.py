@@ -99,7 +99,7 @@ def main():
     '''Setup and iterate over training'''
     global TERMINATE
 
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
+    use_cuda = not ARGS.no_cuda and torch.cuda.is_available()
 
     # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -119,7 +119,7 @@ def main():
                              transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                   (0.2023, 0.1994, 0.2010))
                          ])),
-        batch_size=args.batch_size, shuffle=True, **kwargs)
+        batch_size=ARGS.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10('/scratch/data', train=False, download=True,
                          transform=transforms.Compose([
@@ -127,31 +127,34 @@ def main():
                              transforms.Normalize((0.4914, 0.4822, 0.4465),
                                                   (0.2023, 0.1994, 0.2010))
                          ])),
-        batch_size=args.batch_size, shuffle=True, **kwargs)
+        batch_size=ARGS.batch_size, shuffle=True, **kwargs)
 
     model = ResNet18().to(device)
-    optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=5e-4,
+    optimizer = optim.SGD(model.parameters(), lr=ARGS.lr, weight_decay=5e-4,
                           momentum=0.9)
 
     scheduler = MultiStepLR(optimizer, milestones=[150, 250],
                             gamma=0.1)
 
-    if args.use_pfi:
+    if ARGS.use_pfi:
         mdl = model
         name = "pfi_cifar_resnet18.pt"
-        logging.info('Using PFI from epoch %i', args.pfi_epoch)
+        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
     else:
         mdl = model
         name = "cifar_resnet18.pt"
 
+    # TODO resume from existing model
+    # if: existing model did not complete
+
     acc, loss, cor, tot = test(model, device, test_loader)
-    with trange(1, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
+    with trange(1, ARGS.epochs + 1, unit='Epoch', desc='Training') as pbar:
         tqdm.write(
             f'Validation Accuracy (-1): {acc:.4f}, '
             f'Loss: {loss:.4f} '
             f'({cor}/{tot})')
         for epoch in pbar:
-            if args.use_pfi and epoch == args.pfi_epoch:
+            if ARGS.use_pfi and epoch == ARGS.pfi_epoch:
                 # change to PFI
                 # delayed to increase likelihood of convergence
                 acc, loss, cor, tot = test(mdl, device, test_loader)
@@ -167,7 +170,7 @@ def main():
 
                 torch.save(mdl.state_dict(), name)
                 tqdm.write(f'Updated {name}')
-            elif epoch % args.log_frequency == 0 and epoch != 0:
+            elif epoch % ARGS.log_frequency == 0 and epoch != 0:
                 # validation every N epochs
                 # also check to see if PFI should be turned on now
                 acc, loss, cor, tot = test(mdl, device, test_loader)
@@ -205,7 +208,7 @@ def main():
         conf = np.zeros(10)
         mem = -1.0
 
-    if args.save_model:
+    if ARGS.save_model:
         if TERMINATE:
             # only ask if terminated
             if input('Early terminated, save model? y/[n]') != 'y':
@@ -227,9 +230,12 @@ def signal_handler(sig, frame):
 
 
 if __name__ == '__main__':
+    # TODO check for existing model before overwrite
     import signal
     signal.signal(signal.SIGINT, signal_handler)
     logging.basicConfig(level=logging.DEBUG)
+
+    # TODO allow for model ckpt name/path specification
 
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
@@ -254,6 +260,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--save-model', action='store_true', default=True,
                         help='For Saving the current Model')
-    args = parser.parse_args()
+    ARGS = parser.parse_args()
 
     main()
+    # TODO migrate model off local server after training
