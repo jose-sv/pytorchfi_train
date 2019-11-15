@@ -92,7 +92,7 @@ def eval_confidences(model, device, test_loader):
 
     accuracy = 100. * correct / len(test_loader.dataset)
     confidences /= len(test_loader.dataset)
-    return accuracy, confidences
+    return {'acc': accuracy, 'conf': confidences}
 
 
 def try_resume(name, device):
@@ -130,7 +130,7 @@ def try_resume(name, device):
 
 def main(args, name, use_cuda):
     '''Setup and iterate over training'''
-    global TERMINATE
+    global TERMINATE  # noqa
 
     # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -207,14 +207,14 @@ def main(args, name, use_cuda):
             scheduler.step()
 
     if not TERMINATE or input('Evaluate? y/[n]') == 'y':
-        t_out, conf = eval_confidences(model, device, test_loader)
+        t_out = eval_confidences(model, device, test_loader)
         # t_out = test(model, device, test_loader)
         m_out = test(model, device, train_loader)
 
         try:
             print(f"""Final model accuracy: {t_out['acc']:.2f}%
                   Memorized: {m_out['acc']:.3f}%
-                  Confidences: {conf}""")
+                  Confidences: {t_out['conf']}""")
         except:  # noqa
             pdb.set_trace()
 
@@ -232,7 +232,7 @@ def signal_handler(sig, frame):
     '''Handle an interrupt for a graceful exit'''
     logging.warning('Caught Signal %s: Exiting at end of epoch', sig)
     logging.debug('Caught at %s', frame)
-    global TERMINATE
+    global TERMINATE  # noqa
     TERMINATE = True
 
 
