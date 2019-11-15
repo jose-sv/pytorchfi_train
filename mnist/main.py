@@ -224,7 +224,7 @@ def main(args, name, use_cuda):
             logging.warning("Didn't save")
             return
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
-                    'epoch': epoch}, name)
+                    'epoch': -1 if not TERMINATE else epoch}, name)
         logging.info('Saved %s', name)
 
 
