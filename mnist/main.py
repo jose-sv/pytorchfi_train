@@ -186,10 +186,12 @@ def main():
 
     pdb.set_trace()
     if not TERMINATE:
-        acc, conf = eval_confidences(mdl, device, test_loader)
+        # acc, conf = eval_confidences(mdl, device, test_loader)
+        acc, _, _, _ = test(mdl, device, test_loader)
         mem, _, _, _ = test(mdl, device, train_loader)
     elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
-        acc, conf = eval_confidences(mdl, device, test_loader)
+        # acc, conf = eval_confidences(mdl, device, test_loader)
+        acc, _, _, _ = test(mdl, device, test_loader)
         mem, _, _, _ = test(mdl, device, train_loader)
     else:
         conf = np.zeros(10)
