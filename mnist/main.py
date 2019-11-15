@@ -7,6 +7,7 @@ from tqdm import tqdm, trange
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 from torchvision import datasets, transforms
@@ -80,8 +81,9 @@ def eval_confidences(model, device, test_loader):
     with torch.no_grad():
         for data, target in pbar:
             data, target = data.to(device), target.to(device)
-            output = model(data)
-            confidences += output.numpy()
+            output = F.softmax(model(data), dim=1)
+            pdb.set_trace()
+            confidences += output.cpu().numpy().sum()
             # get the index of the max log-probability
             _, pred = output.max(1)
             correct += pred.eq(target).sum().item()
