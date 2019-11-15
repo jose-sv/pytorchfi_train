@@ -211,9 +211,12 @@ def main(args, name, use_cuda):
         # t_out = test(model, device, test_loader)
         m_out = test(model, device, train_loader)
 
-        print(f"""Final model accuracy: {t_out['acc']:.2f}%
-              Memorized: {m_out['acc']:.3f}%
-              Confidences: {conf}""")
+        try:
+            print(f"""Final model accuracy: {t_out['acc']:.2f}%
+                  Memorized: {m_out['acc']:.3f}%
+                  Confidences: {conf}""")
+        except:  # noqa
+            pdb.set_trace()
 
     if args.save_model:
         if TERMINATE and input('Early terminated, save model? y/[n]') != 'y':
