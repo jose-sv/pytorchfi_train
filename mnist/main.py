@@ -108,15 +108,17 @@ def try_resume(name, device):
     if os.path.isfile('tmp.ckpt') and \
        input('Load from unfinalized? [y]/n') != 'n':
         prev = torch.load('tmp.ckpt')
+        res = 'tmp.ckpt'
 
     elif os.path.isfile(name):
         prev = torch.load(name)
+        res = name
     else:  # nothing to resume!
         logging.info('Nothing to resume')
         return model, estrt
 
     if prev['epoch'] != -1:  # didn't complete
-        logging.info('Resuming from %s at epoch %i, acc %i', prev,
+        logging.info('Resuming from %s at epoch %i, acc %i', res,
                      prev['epoch'], prev['acc'])
         model.load_state_dict(prev['net'])
         estrt = prev['epoch']
