@@ -101,9 +101,7 @@ def try_resume(name, device):
 
     Input: model
 
-    Return: model
-
-    Return the model to use, and the epoch to start training from'''
+    Return: model, epoch to start/resume from'''
     model = ResNet18().to(device)
     estrt = 0
 
