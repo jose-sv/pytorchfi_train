@@ -85,7 +85,6 @@ def eval_confidences(model, device, test_loader):
         for data, target in pbar:
             data, target = data.to(device), target.to(device)
             output = F.softmax(model(data), dim=1)
-            pdb.set_trace()
             confidences += output.sum(dim=0).cpu().numpy() / 128
             # get the index of the max log-probability
             _, pred = output.max(1)
