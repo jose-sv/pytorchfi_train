@@ -83,8 +83,6 @@ def main():
     '''Setup and iterate over training'''
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
-    torch.manual_seed(args.seed)
-
     # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
 
@@ -123,6 +121,7 @@ def main():
     if args.use_pfi:
         mdl = model
         name = "pfi_cifar_resnet18.pt"
+        logging.info('Using PFI from epoch %i', args.pfi_epoch)
     else:
         mdl = model
         name = "cifar_resnet18.pt"
@@ -130,18 +129,18 @@ def main():
     acc = test(model, device, test_loader)
     with trange(1, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
         for epoch in pbar:
-            # validation every N epochs
-            # also check to see if PFI should be turned on now
-            if epoch % args.log_frequency == 0 and epoch != 0:
-                acc = test(mdl, device, test_loader)
-
-                # change to PFI at epoch 50
+            if args.use_pfi and epoch == args.pfi_epoch:
+                # change to PFI
                 # delayed to increase likelihood of convergence
-                if args.use_pfi and epoch == 50:
-                    pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
-                    inj_model = pfi_util.random_inj_per_layer()
-                    mdl = inj_model
-                    pbar.set_desc('PFI Training')
+                acc = test(mdl, device, test_loader)
+                pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+                inj_model = pfi_util.random_inj_per_layer()
+                mdl = inj_model
+                pbar.set_description('PFI Training')
+            elif epoch % args.log_frequency == 0 and epoch != 0:
+                # validation every N epochs
+                # also check to see if PFI should be turned on now
+                acc = test(mdl, device, test_loader)
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
 
@@ -161,7 +160,7 @@ def main():
         mem = test(mdl, device, train_loader)
         eval_confidences(mdl, device, test_loader)
     else:
-        mem = 0.0
+        mem = -1.0
 
     print(f"""Final model accuracy: {acc:.2f}%
           Memorized: {mem:.3f}%""")
@@ -190,21 +189,23 @@ if __name__ == '__main__':
 
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser.add_argument('--use-pfi', action='store_true', default=False,
+                        help='Use PFI as a dropout alternative')
+    parser.add_argument('--pfi-epoch', type=int, default=50,
+                        help='Epoch at which to activate PFI')
+
     parser.add_argument('--batch-size', type=int, default=128, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=128,
                         metavar='N',
                         help='input batch size for testing (default: 1000)')
+
     parser.add_argument('--epochs', type=int, default=350, metavar='N',
                         help='number of epochs to train (default: 350)')
     parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
                         help='learning rate (default: 1.0)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
-    parser.add_argument('--use-pfi', action='store_true', default=False,
-                        help='Use PFI as a dropout alternative')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
     parser.add_argument('--log-frequency', type=int, default=50)
 
     parser.add_argument('--save-model', action='store_true', default=True,
