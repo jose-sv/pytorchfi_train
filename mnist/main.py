@@ -75,6 +75,7 @@ def test(model, device, test_loader):
 def eval_confidences(model, device, test_loader):
     '''Calculate statistics on the confidences across a dataset'''
     return -1.0, np.zeros(10)
+
     model.eval()
     correct = 0
     confidences = np.zeros(10)
@@ -163,6 +164,9 @@ def main():
                 inj_model = pfi_util.random_inj_per_layer()
                 mdl = inj_model
                 pbar.set_description('PFI Training')
+
+                torch.save(mdl.state_dict(), name)
+                tqdm.write(f'Updated {name}')
             elif epoch % args.log_frequency == 0 and epoch != 0:
                 # validation every N epochs
                 # also check to see if PFI should be turned on now
@@ -171,6 +175,9 @@ def main():
                     f'Validation Accuracy ({epoch}): {acc:.4f}, '
                     f'Loss: {loss:.4f} '
                     f'({cor}/{tot})')
+
+                torch.save(mdl.state_dict(), name)
+                tqdm.write(f'Updated {name}')
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f'{acc:.2f}%')
 
@@ -184,22 +191,19 @@ def main():
             train(mdl, device, train_loader, optimizer)
             scheduler.step()
 
-    pdb.set_trace()
     if not TERMINATE:
         # acc, conf = eval_confidences(mdl, device, test_loader)
+        conf = np.zeros(10)
         acc, _, _, _ = test(mdl, device, test_loader)
         mem, _, _, _ = test(mdl, device, train_loader)
     elif input('Evaluate? y/[n]') == 'y':  # only ask if terminated
         # acc, conf = eval_confidences(mdl, device, test_loader)
+        conf = np.zeros(10)
         acc, _, _, _ = test(mdl, device, test_loader)
         mem, _, _, _ = test(mdl, device, train_loader)
     else:
         conf = np.zeros(10)
         mem = -1.0
-
-    print(f"""Final model accuracy: {acc:.2f}%
-          Memorized: {mem:.3f}%
-          Confidences: {conf}""")
 
     if args.save_model:
         if TERMINATE:
@@ -209,6 +213,10 @@ def main():
                 return
         torch.save(mdl.state_dict(), name)
         logging.info('Saved %s', name)
+
+    print(f"""Final model accuracy: {acc:.2f}%
+          Memorized: {mem:.3f}%
+          Confidences: {conf}""")
 
 
 def signal_handler(sig, frame):
