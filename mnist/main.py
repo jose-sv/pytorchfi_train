@@ -197,7 +197,7 @@ def main(args, name, use_cuda):
             pbar.set_postfix(lr=get_lr(optimizer), acc=f"{t_out['acc']:.2f}%")
 
             if TERMINATE:
-                if input('Quit? [y]/n') != 'n':
+                if input('Quit? [y]/n ') != 'n':
                     logging.info('Terminating')
                     break
                 else:
@@ -206,7 +206,7 @@ def main(args, name, use_cuda):
             train(model, device, train_loader, optimizer)
             scheduler.step()
 
-    if not TERMINATE or input('Evaluate? y/[n]') == 'y':
+    if not TERMINATE or input('Evaluate? y/[n] ') == 'y':
         t_out = eval_confidences(model, device, test_loader)
         # t_out = test(model, device, test_loader)
         m_out = test(model, device, train_loader)
@@ -219,12 +219,12 @@ def main(args, name, use_cuda):
             pdb.set_trace()
 
     if args.save_model:
-        if TERMINATE and input('Early terminated, save model? y/[n]') != 'y':
+        if TERMINATE and input('Early terminated, save model? y/[n] ') != 'y':
             # only ask if terminated
             logging.warning("Didn't save")
             return
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
-                    'epoch': -1}, name)
+                    'epoch': epoch}, name)
         logging.info('Saved %s', name)
 
 
