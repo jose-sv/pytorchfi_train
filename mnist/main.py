@@ -106,7 +106,7 @@ def try_resume(name, device):
 
     # if unfinalized exists, attempt to load from that first
     if os.path.isfile('tmp.ckpt') and \
-       input('Load from unfinalized? [y]/n') != 'n':
+       input('Load from unfinalized? [y]/n ') != 'n':
         prev = torch.load('tmp.ckpt')
         res = 'tmp.ckpt'
 
