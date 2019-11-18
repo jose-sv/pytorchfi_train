@@ -75,6 +75,27 @@ def test(model, device, test_loader):
             len(test_loader.dataset)}
 
 
+def eval_confidences(model, device, test_loader):
+    '''Calculate statistics on the confidences across a dataset'''
+    # TODO calculate tolerance(top2-diff)
+    model.eval()
+    correct = 0
+    confidences = np.zeros(10)
+    pbar = tqdm(test_loader, unit='Batches', desc='Confidences')
+    with torch.no_grad():
+        for data, target in pbar:
+            data, target = data.to(device), target.to(device)
+            output = F.softmax(model(data), dim=1)
+            confidences += output.sum(dim=0).cpu().numpy() / 128
+            # get the index of the max log-probability
+            _, pred = output.max(1)
+            correct += pred.eq(target).sum().item()
+
+    accuracy = 100. * correct / len(test_loader.dataset)
+    confidences /= len(test_loader.dataset)
+    return {'acc': accuracy, 'conf': confidences}
+
+
 def try_resume(name, device, use_cuda):
     '''If an unfinished model exists, load and use it.
 
@@ -213,7 +234,8 @@ def main(args, name, use_cuda):
             scheduler.step()
 
     if not TERMINATE or input('Evaluate? y/[n] ') == 'y':
-        t_out = test(model, device, test_loader)
+        t_out = eval_confidences(model, device, test_loader)
+        # t_out = test(model, device, test_loader)
         m_out = test(model, device, train_loader)
         progress.append({'epoch': epoch, 'val_acc': t_out['acc'],
                          'mem': m_out['acc'], 'lr': get_lr(optimizer)})
