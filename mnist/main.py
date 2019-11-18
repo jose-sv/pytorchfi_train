@@ -141,6 +141,9 @@ def main(args, name, use_cuda):
 
     model, estrt = try_resume(name, device)
 
+    pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+    model = pfi_util.random_inj_per_layer()
+
     # TODO @ma3mool please check whether optimizer must be updated when
     # switching to PFI (Issue #1)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_decay=5e-4,
@@ -148,12 +151,14 @@ def main(args, name, use_cuda):
 
     scheduler = MultiStepLR(optimizer, milestones=[150, 250], gamma=0.1)
 
+    desc = 'PFI Training' if args.use_pfi else 'Training'
+
     for _ in range(estrt):
         scheduler.step()
 
-    with trange(estrt, args.epochs + 1, unit='Epoch', desc='Training') as pbar:
+    with trange(estrt, args.epochs + 1, unit='Epoch', desc=desc) as pbar:
         for epoch in pbar:
-            if epoch % args.log_frequency == 0 or epoch == args.pfi_epoch:
+            if epoch % args.log_frequency == 0:
                 # test
                 t_out = test(model, device, test_loader)
 
@@ -167,11 +172,6 @@ def main(args, name, use_cuda):
                     f"Validation Accuracy ({epoch}): {t_out['acc']:.4f}, "
                     f"Loss: {t_out['tloss']:.4f} "
                     f"({t_out['corr']}/{t_out['len']})")
-
-            if args.use_pfi and epoch == args.pfi_epoch:  # change model
-                pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
-                model = pfi_util.random_inj_per_layer()
-                pbar.set_description('PFI Training')
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f"{t_out['acc']:.2f}%")
 
@@ -224,8 +224,6 @@ if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(description='PyTorch MNIST Example')
     PARSER.add_argument('--use-pfi', action='store_true', default=False,
                         help='Use PFI as a dropout alternative')
-    PARSER.add_argument('--pfi-epoch', type=int, default=50,
-                        help='Epoch at which to activate PFI')
 
     PARSER.add_argument('--batch-size', type=int, default=128, metavar='N',
                         help='input batch size for training (default: 64)')
@@ -248,7 +246,6 @@ if __name__ == '__main__':
     NAME = "cifar_resnet18.pt"
     if ARGS.use_pfi:
         NAME = f"pfi_{NAME}"
-        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
 
     USE_CUDA = not ARGS.no_cuda and torch.cuda.is_available()
 
