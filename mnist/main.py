@@ -171,6 +171,15 @@ def main(args, name, use_cuda):
             if args.use_pfi and epoch == args.pfi_epoch:  # change model
                 pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
                 model = pfi_util.random_inj_per_layer()
+
+                # make a new optimizer on the pfi model!
+                optimizer = optim.SGD(model.parameters(), lr=args.lr,
+                                      weight_decay=5e-4, momentum=0.9)
+                scheduler = MultiStepLR(optimizer, milestones=[150, 250],
+                                        gamma=0.1)
+                for _ in range(epoch):  # update LR progress
+                    scheduler.step()
+
                 pbar.set_description('PFI Training')
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f"{t_out['acc']:.2f}%")
