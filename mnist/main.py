@@ -141,8 +141,9 @@ def main(args, name, use_cuda):
 
     model, estrt = try_resume(name, device)
 
-    pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
-    model = pfi_util.random_inj_per_layer()
+    if args.use_pfi:
+        pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+        model = pfi_util.random_inj_per_layer()
 
     # TODO @ma3mool please check whether optimizer must be updated when
     # switching to PFI (Issue #1)
