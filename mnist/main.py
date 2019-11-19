@@ -218,7 +218,7 @@ def main(args, name, use_cuda):
         progress.append({'epoch': epoch, 'val_acc': t_out['acc'],
                          'mem': m_out['acc'], 'lr': get_lr(optimizer)})
 
-    print(f"Final model accuracy: {progress[-1]['acc']:.2f}%\n"
+    print(f"Final model accuracy: {progress[-1]['val_acc']:.2f}%\n"
           f"Memorized: {progress[-1]['mem']:.3f}%")
 
     if args.save_model:
