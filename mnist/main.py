@@ -232,6 +232,7 @@ def main(args, name, use_cuda):
                   Memorized: {m_out['acc']:.3f}%
                   Confidences: {t_out['conf']}""")
         except:  # noqa
+            # TODO handle this instead of pdb!
             pdb.set_trace()
 
     if args.save_model:
