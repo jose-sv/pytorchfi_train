@@ -85,12 +85,7 @@ def try_resume(name, device):
     estrt = 0
 
     # if unfinalized exists, attempt to load from that first
-    if os.path.isfile('tmp.ckpt') and \
-       input('Load from unfinalized? [y]/n ') != 'n':
-        prev = torch.load('tmp.ckpt')
-        res = 'tmp.ckpt'
-
-    elif os.path.isfile(name):
+    if os.path.isfile(name):
         prev = torch.load(name)
         res = name
     else:  # nothing to resume!
@@ -175,9 +170,6 @@ def main(args, name, use_cuda):
                                      -1})
 
                 # update statistics and checkpoint
-                # use a tmp model to prevent accidental overwrites
-                torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
-                            'mem': m_out['acc'], 'epoch': epoch}, 'tmp.ckpt')
                 tqdm.write(
                     f"Validation Accuracy ({epoch}): {t_out['acc']:.4f}, "
                     f"({t_out['corr']}/{t_out['len']}) "
@@ -285,7 +277,6 @@ if __name__ == '__main__':
 
     progress = main(ARGS, NAME, USE_CUDA)
     # TODO migrate model off local server after training
-    os.remove('tmp.ckpt')
 
     if progress is not None:
         with open('train.log', 'w') as out_file:
