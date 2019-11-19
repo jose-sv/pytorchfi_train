@@ -172,10 +172,8 @@ def main(args, name, use_cuda):
                             'mem': m_out['acc'], 'epoch': epoch}, 'tmp.ckpt')
                 tqdm.write(
                     f"Validation Accuracy ({epoch}): {t_out['acc']:.4f}, "
-                    f"Memorized: {m_out['acc']}, "
-                    f"Loss: {t_out['tloss']:.4f} "
                     f"({t_out['corr']}/{t_out['len']}) "
-                    f"Updated tmp.ckpt")
+                    f"Memorized: {m_out['acc']}, ")
 
             # change model to PFI at [epoch]
             if args.use_pfi and epoch == args.pfi_epoch and epoch != 0:
@@ -275,3 +273,4 @@ if __name__ == '__main__':
 
     main(ARGS, NAME, USE_CUDA)
     # TODO migrate model off local server after training
+    os.remove('tmp.ckpt')
