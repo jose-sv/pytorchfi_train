@@ -75,7 +75,7 @@ def test(model, device, test_loader):
             len(test_loader.dataset)}
 
 
-def try_resume(name, device):
+def try_resume(name, device, use_cuda):
     '''If an unfinished model exists, load and use it.
 
     Input: model
@@ -87,6 +87,10 @@ def try_resume(name, device):
     # if unfinalized exists, attempt to load from that first
     if os.path.isfile(name):
         prev = torch.load(name)
+        if prev['pfi']:
+            pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+            model = pfi_util.random_inj_per_layer()
+            logging.info('Resuming PFI model')
         res = name
     else:  # nothing to resume!
         logging.info('Nothing to resume')
@@ -137,9 +141,9 @@ def main(args, name, use_cuda):
                          ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
-    model, estrt = try_resume(name, device)
+    model, estrt = try_resume(name, device, use_cuda)
 
-    if args.use_pfi and args.pfi_epoch == 0:
+    if args.use_pfi and args.pfi_epoch == 0 and estrt == 0:
         pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
         model = pfi_util.random_inj_per_layer()
         logging.info('Using PFI from epoch 0')
@@ -219,7 +223,8 @@ def main(args, name, use_cuda):
             logging.warning("Didn't save")
             return None
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
-                    'epoch': -1 if not TERMINATE else epoch}, name)
+                    'epoch': -1 if not TERMINATE else epoch,
+                    'pfi': epoch > args.pfi_epoch}, name)
         logging.info('Saved %s', name)
 
     return progress
