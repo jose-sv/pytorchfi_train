@@ -141,7 +141,7 @@ def main(args, name, use_cuda):
 
     model, estrt = try_resume(name, device)
 
-    if args.use_pfi:
+    if args.use_pfi and args.pfi_epoch == 0:
         pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
         model = pfi_util.random_inj_per_layer()
 
@@ -225,6 +225,8 @@ if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(description='PyTorch MNIST Example')
     PARSER.add_argument('--use-pfi', action='store_true', default=False,
                         help='Use PFI as a dropout alternative')
+    PARSER.add_argument('--pfi-epoch', default=0, type=int,
+                        help='Epoch from which to start PFI')
 
     PARSER.add_argument('--batch-size', type=int, default=128, metavar='N',
                         help='input batch size for training (default: 64)')
@@ -247,6 +249,7 @@ if __name__ == '__main__':
     NAME = "cifar_resnet18.pt"
     if ARGS.use_pfi:
         NAME = f"pfi_{NAME}"
+        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
 
     USE_CUDA = not ARGS.no_cuda and torch.cuda.is_available()
 
