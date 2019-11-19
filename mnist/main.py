@@ -112,7 +112,7 @@ def main(args, name, use_cuda):
     '''Setup and iterate over training'''
     global TERMINATE  # noqa
 
-    progress = {'val_acc': [], 'mem': []}
+    progress = []
 
     # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -165,12 +165,14 @@ def main(args, name, use_cuda):
         for epoch in pbar:
             if epoch % args.log_frequency == 0:
                 t_out = test(model, device, test_loader)
-                progress['val_acc'].append(t_out['acc'])
                 if not args.no_mem:
                     m_out = test(model, device, train_loader)
-                    progress['mem'].append(m_out['acc'])
+                    progress.append({'val_acc': t_out['acc'], 'mem':
+                                     m_out['acc']})
                 else:
                     m_out['acc'] = 'NA'
+                    progress.append({'val_acc': t_out['acc'], 'mem':
+                                     -1})
 
                 # update statistics and checkpoint
                 # use a tmp model to prevent accidental overwrites
@@ -211,9 +213,8 @@ def main(args, name, use_cuda):
 
     if not TERMINATE or input('Evaluate? y/[n] ') == 'y':
         t_out = test(model, device, test_loader)
-        progress['val_acc'].append(t_out['acc'])
         m_out = test(model, device, train_loader)
-        progress['mem'].append(m_out['acc'])
+        progress.append({'val_acc': t_out['acc'], 'mem': m_out['acc']})
 
         try:
             print(f"""Final model accuracy: {t_out['acc']:.2f}%
@@ -288,5 +289,6 @@ if __name__ == '__main__':
 
     with open('train.log', 'w') as out_file:
         writer = csv.DictWriter(out_file, fieldnames=['val_acc', 'mem'])
-        for data in progress:
-            writer.writerow(data)
+        writer.writeheader()
+        for log in progress:
+            writer.writerow(log)
