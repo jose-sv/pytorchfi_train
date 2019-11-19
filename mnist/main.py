@@ -160,19 +160,22 @@ def main(args, name, use_cuda):
     with trange(estrt, args.epochs + 1, unit='Epoch', desc=desc) as pbar:
         for epoch in pbar:
             if epoch % args.log_frequency == 0:
-                # test
                 t_out = test(model, device, test_loader)
+                if not args.no_mem:
+                    m_out = test(model, device, train_loader)
+                else:
+                    m_out['acc'] = 'NA'
 
-                # update
+                # update statistics and checkpoint
                 # use a tmp model to prevent accidental overwrites
                 torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
-                            'epoch': epoch}, 'tmp.ckpt')
-                tqdm.write(f'Updated tmp.ckpt')
-
+                            'mem': m_out['acc'], 'epoch': epoch}, 'tmp.ckpt')
                 tqdm.write(
                     f"Validation Accuracy ({epoch}): {t_out['acc']:.4f}, "
+                    f"Memorized: {m_out['acc']}, "
                     f"Loss: {t_out['tloss']:.4f} "
-                    f"({t_out['corr']}/{t_out['len']})")
+                    f"({t_out['corr']}/{t_out['len']}) "
+                    f"Updated tmp.ckpt")
 
             # change model to PFI at [epoch]
             if args.use_pfi and epoch == args.pfi_epoch and epoch != 0:
@@ -240,6 +243,8 @@ if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(description='PyTorch MNIST Example')
     PARSER.add_argument('--use-pfi', action='store_true', default=False,
                         help='Use PFI as a dropout alternative')
+    PARSER.add_argument('--no-mem', action='store_true', default=False,
+                        help='Traing quickly, without testing memorization')
     PARSER.add_argument('--pfi-epoch', default=0, type=int,
                         help='Epoch from which to start PFI')
 
