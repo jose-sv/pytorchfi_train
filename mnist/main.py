@@ -210,11 +210,8 @@ def main(args, name, use_cuda):
         progress.append({'epoch': epoch, 'val_acc': t_out['acc'],
                          'mem': m_out['acc'], 'lr': get_lr(optimizer)})
 
-        try:
-            print(f"""Final model accuracy: {t_out['acc']:.2f}%
-                  Memorized: {m_out['acc']:.3f}%""")
-        except:  # noqa
-            pdb.set_trace()
+    print(f"Final model accuracy: {progress[-1]['acc']:.2f}%\n"
+          f"Memorized: {progress[-1]['mem']:.3f}%")
 
     if args.save_model:
         if TERMINATE and input('Early terminated, save model? y/[n] ') != 'y':
