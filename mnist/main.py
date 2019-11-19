@@ -4,6 +4,7 @@ import argparse
 import logging
 import pdb
 import os
+import csv
 from tqdm import tqdm, trange
 import numpy as np
 import torch
@@ -111,6 +112,8 @@ def main(args, name, use_cuda):
     '''Setup and iterate over training'''
     global TERMINATE  # noqa
 
+    progress = {'val_acc': [], 'mem': []}
+
     # pylint: disable=E1101
     device = torch.device("cuda" if use_cuda else "cpu")
 
@@ -144,6 +147,7 @@ def main(args, name, use_cuda):
     if args.use_pfi and args.pfi_epoch == 0:
         pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
         model = pfi_util.random_inj_per_layer()
+        logging.info('Using PFI from epoch 0')
 
     # TODO @ma3mool please check whether optimizer must be updated when
     # switching to PFI (Issue #1)
@@ -161,8 +165,10 @@ def main(args, name, use_cuda):
         for epoch in pbar:
             if epoch % args.log_frequency == 0:
                 t_out = test(model, device, test_loader)
+                progress['val_acc'].append(t_out['acc'])
                 if not args.no_mem:
                     m_out = test(model, device, train_loader)
+                    progress['mem'].append(m_out['acc'])
                 else:
                     m_out['acc'] = 'NA'
 
@@ -188,6 +194,7 @@ def main(args, name, use_cuda):
                 for _ in range(epoch):  # update LR progress
                     scheduler.step()
 
+                tqdm.write(f'Changed to PFI at {epoch}')
                 pbar.set_description('PFI Training')
 
             pbar.set_postfix(lr=get_lr(optimizer), acc=f"{t_out['acc']:.2f}%")
@@ -204,7 +211,9 @@ def main(args, name, use_cuda):
 
     if not TERMINATE or input('Evaluate? y/[n] ') == 'y':
         t_out = test(model, device, test_loader)
+        progress['val_acc'].append(t_out['acc'])
         m_out = test(model, device, train_loader)
+        progress['mem'].append(m_out['acc'])
 
         try:
             print(f"""Final model accuracy: {t_out['acc']:.2f}%
@@ -220,6 +229,8 @@ def main(args, name, use_cuda):
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
                     'epoch': -1 if not TERMINATE else epoch}, name)
         logging.info('Saved %s', name)
+
+    return progress
 
 
 def signal_handler(sig, frame):
@@ -271,6 +282,11 @@ if __name__ == '__main__':
 
     USE_CUDA = not ARGS.no_cuda and torch.cuda.is_available()
 
-    main(ARGS, NAME, USE_CUDA)
+    progress = main(ARGS, NAME, USE_CUDA)
     # TODO migrate model off local server after training
     os.remove('tmp.ckpt')
+
+    with open('train.log', 'w') as out_file:
+        writer = csv.DictWriter(out_file, fieldnames=['val_acc', 'mem'])
+        for data in progress:
+            writer.writerow(data)
