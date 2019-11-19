@@ -226,7 +226,7 @@ def main(args, name, use_cuda):
         if TERMINATE and input('Early terminated, save model? y/[n] ') != 'y':
             # only ask if terminated
             logging.warning("Didn't save")
-            return
+            return None
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
                     'epoch': -1 if not TERMINATE else epoch}, name)
         logging.info('Saved %s', name)
@@ -287,8 +287,9 @@ if __name__ == '__main__':
     # TODO migrate model off local server after training
     os.remove('tmp.ckpt')
 
-    with open('train.log', 'w') as out_file:
-        writer = csv.DictWriter(out_file, fieldnames=['val_acc', 'mem'])
-        writer.writeheader()
-        for log in progress:
-            writer.writerow(log)
+    if progress is not None:
+        with open('train.log', 'w') as out_file:
+            writer = csv.DictWriter(out_file, fieldnames=['val_acc', 'mem'])
+            writer.writeheader()
+            for log in progress:
+                writer.writerow(log)
