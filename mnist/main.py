@@ -162,12 +162,13 @@ def main(args, name, use_cuda):
                 t_out = test(model, device, test_loader)
                 if not args.no_mem:
                     m_out = test(model, device, train_loader)
-                    progress.append({'val_acc': t_out['acc'], 'mem':
-                                     m_out['acc']})
+                    progress.append({'epoch': epoch, 'val_acc': t_out['acc'],
+                                     'mem': m_out['acc'],
+                                     'lr': get_lr(optimizer)})
                 else:
                     m_out['acc'] = 'NA'
-                    progress.append({'val_acc': t_out['acc'], 'mem':
-                                     -1})
+                    progress.append({'epoch': epoch, 'val_acc': t_out['acc'],
+                                     'mem': -1, 'lr': get_lr(optimizer)})
 
                 # update statistics and checkpoint
                 tqdm.write(
@@ -206,7 +207,8 @@ def main(args, name, use_cuda):
     if not TERMINATE or input('Evaluate? y/[n] ') == 'y':
         t_out = test(model, device, test_loader)
         m_out = test(model, device, train_loader)
-        progress.append({'val_acc': t_out['acc'], 'mem': m_out['acc']})
+        progress.append({'epoch': epoch, 'val_acc': t_out['acc'],
+                         'mem': m_out['acc'], 'lr': get_lr(optimizer)})
 
         try:
             print(f"""Final model accuracy: {t_out['acc']:.2f}%
@@ -280,7 +282,8 @@ if __name__ == '__main__':
 
     if progress is not None:
         with open('train.log', 'w') as out_file:
-            writer = csv.DictWriter(out_file, fieldnames=['val_acc', 'mem'])
+            writer = csv.DictWriter(out_file, fieldnames=['epoch', 'val_acc',
+                                                          'mem', 'lr'])
             writer.writeheader()
             for log in progress:
                 writer.writerow(log)
