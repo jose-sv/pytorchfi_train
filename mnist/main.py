@@ -258,6 +258,9 @@ if __name__ == '__main__':
     PARSER.add_argument('--pfi-epoch', default=0, type=int,
                         help='Epoch from which to start PFI')
 
+    PARSER.add_argument('--name', default='cifar_resnet18', type=str,
+                        help='Name to use for outputs')
+
     PARSER.add_argument('--batch-size', type=int, default=128, metavar='N',
                         help='input batch size for training (default: 64)')
     PARSER.add_argument('--test-batch-size', type=int, default=128,
@@ -276,7 +279,7 @@ if __name__ == '__main__':
                         help='For Saving the current Model')
     ARGS = PARSER.parse_args()
 
-    NAME = "cifar_resnet18.pt"
+    NAME = f"{ARGS.name}.pt"
     if ARGS.use_pfi:
         NAME = f"pfi_{NAME}"
         logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
@@ -287,7 +290,7 @@ if __name__ == '__main__':
     # TODO migrate model off local server after training
 
     if progress is not None:
-        with open('train.log', 'w') as out_file:
+        with open(f'{NAME}_train.log', 'w') as out_file:
             writer = csv.DictWriter(out_file, fieldnames=['epoch', 'val_acc',
                                                           'mem', 'lr'])
             writer.writeheader()
