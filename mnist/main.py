@@ -87,10 +87,14 @@ def try_resume(name, device, use_cuda):
     # if unfinalized exists, attempt to load from that first
     if os.path.isfile(name):
         prev = torch.load(name)
-        if prev['pfi']:
-            pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
-            model = pfi_util.random_inj_per_layer()
-            logging.info('Resuming PFI model')
+        try:
+            if prev['pfi']:
+                pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
+                model = pfi_util.random_inj_per_layer()
+                logging.info('Resuming PFI model')
+        except KeyError:
+            logging.warning('Old model found! Continuing, but could fail to '
+                            'load')
         res = name
     else:  # nothing to resume!
         logging.info('Nothing to resume')
