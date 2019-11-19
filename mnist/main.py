@@ -166,7 +166,7 @@ def main(args, name, use_cuda):
 
     with trange(estrt, args.epochs + 1, unit='Epoch', desc=desc) as pbar:
         for epoch in pbar:
-            if epoch % args.log_frequency == 0:
+            if epoch % args.log_frequency == 0 or epoch == estrt:
                 t_out = test(model, device, test_loader)
                 if not args.no_mem:
                     m_out = test(model, device, train_loader)
