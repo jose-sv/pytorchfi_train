@@ -1,9 +1,9 @@
-[submodule "mnist/resnet"]
-	path = resnet
-	url = git@github.com:jose-sv/resnet.git
 [submodule "mnist/pytorchfi"]
 	path = pytorchfi
 	url = git@github.com:ma3mool/pytorchfi_dsn.git
 [submodule "mnist/pytorchfi_dsn"]
 	path = pytorchfi_dsn
 	url = git@github.com:ma3mool/pytorchfi_dsn.git
+[submodule "resnet"]
+	path = resnet
+	url = https://github.com/jose-sv/resnet
