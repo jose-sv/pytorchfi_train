@@ -2,14 +2,11 @@
 from __future__ import print_function
 import argparse
 import logging
-import pdb
 import os
 import csv
 from tqdm import tqdm, trange
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
 from torchvision import datasets, transforms
@@ -18,7 +15,7 @@ from pytorchfi import PyTorchFI_Util as pfi_util
 from pytorchfi import PyTorchFI_Core as pfi_core
 from resnet.models.resnet import ResNet18
 
-
+# pylint: disable=C0103
 # early termination by signal
 TERMINATE = False
 
@@ -89,29 +86,33 @@ def try_resume(name, device, use_cuda):
         prev = torch.load(name)
         try:
             if prev['pfi']:
+                # change model so it can load PFI checkpoints correctly
                 pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
                 model = pfi_util.random_inj_per_layer()
                 logging.info('Resuming PFI model')
         except KeyError:
+            # before we started saving the PFI flag
             logging.warning('Old model found! Continuing, but could fail to '
                             'load')
         res = name
+
     else:  # nothing to resume!
-        logging.info('Nothing to resume')
+        logging.info('%s not found', name)
         return model, estrt
 
     if prev['epoch'] != -1:  # didn't complete
         logging.info('Resuming from %s at epoch %i, acc %i', res,
                      prev['epoch'], prev['acc'])
-        model.load_state_dict(prev['net'])
-        estrt = prev['epoch']
     else:
-        logging.warning('Overwriting %s', name)
+        logging.info('Resuming from %s, acc %i', res, prev['acc'])
+
+    model.load_state_dict(prev['net'])
+    estrt = prev['epoch']
 
     return model, estrt
 
 
-def main(args, name, use_cuda):
+def main(args, load_name, save_name, use_cuda):
     '''Setup and iterate over training'''
     global TERMINATE  # noqa
 
@@ -145,7 +146,7 @@ def main(args, name, use_cuda):
                          ])),
         batch_size=args.batch_size, shuffle=True, **kwargs)
 
-    model, estrt = try_resume(name, device, use_cuda)
+    model, estrt = try_resume(load_name, device, use_cuda)
 
     if args.use_pfi and args.pfi_epoch == 0 and estrt == 0:
         pfi_core.init(model, 32, 32, 128, use_cuda=use_cuda)
@@ -221,15 +222,15 @@ def main(args, name, use_cuda):
     print(f"Final model accuracy: {progress[-1]['val_acc']:.2f}%\n"
           f"Memorized: {progress[-1]['mem']:.3f}%")
 
-    if args.save_model:
+    if args.no_save:
         if TERMINATE and input('Early terminated, save model? y/[n] ') != 'y':
             # only ask if terminated
             logging.warning("Didn't save")
             return None
         torch.save({'net': model.state_dict(), 'acc': t_out['acc'],
                     'epoch': -1 if not TERMINATE else epoch,
-                    'pfi': epoch > args.pfi_epoch}, name)
-        logging.info('Saved %s', name)
+                    'pfi': epoch > args.pfi_epoch and args.use_pfi}, save_name)
+        logging.info('Saved %s', save_name)
 
     return progress
 
@@ -250,47 +251,53 @@ if __name__ == '__main__':
     # TODO allow for model ckpt name/path specification
 
     # Training settings
-    PARSER = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    PARSER.add_argument('--use-pfi', action='store_true', default=False,
-                        help='Use PFI as a dropout alternative')
-    PARSER.add_argument('--no-mem', action='store_true', default=False,
-                        help='Traing quickly, without testing memorization')
-    PARSER.add_argument('--pfi-epoch', default=0, type=int,
-                        help='Epoch from which to start PFI')
+    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    pfi_group = parser.add_argument_group('PFI Options')
+    pfi_group.add_argument('--use-pfi', action='store_true', default=False,
+                           help='Use PFI as a dropout alternative')
+    pfi_group.add_argument('--no-mem', action='store_true', default=False,
+                           help='Traing quickly, without testing memorization')
+    pfi_group.add_argument('--pfi-epoch', default=0, type=int,
+                           help='Epoch from which to start PFI')
 
-    PARSER.add_argument('--name', default='cifar_resnet18', type=str,
-                        help='Name to use for outputs')
+    ckpt_group = parser.add_argument_group('Checkpoint Options')
+    ckpt_group.add_argument('--load-name', default='cifar_resnet18', type=str,
+                            help='Checkpoint to use as base for training')
+    ckpt_group.add_argument('--save-name', default='cifar_resnet18', type=str,
+                            help='Checkpoint to save trained model to')
+    ckpt_group.add_argument('--no-save', action='store_false', default=True,
+                            help='For Saving the current Model')
 
-    PARSER.add_argument('--batch-size', type=int, default=128, metavar='N',
-                        help='input batch size for training (default: 64)')
-    PARSER.add_argument('--test-batch-size', type=int, default=128,
-                        metavar='N',
-                        help='input batch size for testing (default: 1000)')
+    train_group = parser.add_argument_group('Training Options')
+    train_group.add_argument('--batch-size', type=int, default=128,
+                             metavar='N',
+                             help='batch size for training (default: 64)')
+    train_group.add_argument('--test-batch-size', type=int, default=128,
+                             metavar='N',
+                             help='batch size for testing (default: 1000)')
 
-    PARSER.add_argument('--epochs', type=int, default=350, metavar='N',
-                        help='number of epochs to train (default: 350)')
-    PARSER.add_argument('--lr', type=float, default=0.1, metavar='LR',
-                        help='learning rate (default: 1.0)')
-    PARSER.add_argument('--no-cuda', action='store_true', default=False,
-                        help='disables CUDA training')
-    PARSER.add_argument('--log-frequency', type=int, default=50)
+    train_group.add_argument('--epochs', type=int, default=350, metavar='N',
+                             help='number of epochs to train (default: 350)')
+    train_group.add_argument('--lr', type=float, default=0.1, metavar='LR',
+                             help='learning rate (default: 1.0)')
+    train_group.add_argument('--no-cuda', action='store_true', default=False,
+                             help='disables CUDA training')
+    train_group.add_argument('--log-frequency', type=int, default=50)
 
-    PARSER.add_argument('--save-model', action='store_true', default=True,
-                        help='For Saving the current Model')
-    ARGS = PARSER.parse_args()
+    args = parser.parse_args()
 
-    NAME = f"{ARGS.name}.pt"
-    if ARGS.use_pfi:
-        NAME = f"pfi_{NAME}"
-        logging.info('Using PFI from epoch %i', ARGS.pfi_epoch)
+    SAVE_NAME = f"{args.save_name}.pt"
+    if args.use_pfi:
+        SAVE_NAME = f"pfi_{SAVE_NAME}"
+        logging.info('Using PFI from epoch %i', args.pfi_epoch)
 
-    USE_CUDA = not ARGS.no_cuda and torch.cuda.is_available()
+    USE_CUDA = not args.no_cuda and torch.cuda.is_available()
 
-    progress = main(ARGS, NAME, USE_CUDA)
+    progress = main(args, f'{args.load_name}.pt', SAVE_NAME, USE_CUDA)
     # TODO migrate model off local server after training
 
     if progress is not None:
-        with open(f'{NAME}_train.log', 'w') as out_file:
+        with open(f'{SAVE_NAME}_train.log', 'w') as out_file:
             writer = csv.DictWriter(out_file, fieldnames=['epoch', 'val_acc',
                                                           'mem', 'lr'])
             writer.writeheader()
